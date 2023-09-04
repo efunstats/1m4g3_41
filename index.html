@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filtrar y Mostrar Imágenes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Filtrar y Mostrar Imágenes</h1>
+        <input type="text" id="filterInput" class="form-control mb-3" placeholder="Filtrar por tags (separa con comas)">
+        <div id="imageContainer" class="row">
+            <!-- Aquí se mostrarán las imágenes filtradas -->
+        </div>
+        <div class="d-flex justify-content-between mt-3">
+            <button id="prevButton" class="btn btn-primary" disabled>Anterior</button>
+            <span id="pageInfo" class="align-self-center"></span>
+            <button id="nextButton" class="btn btn-primary">Siguiente</button>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar información ampliada -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <img id="modalImage" src="" class="img-fluid" alt="">
+                    <p id="modalTags"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // URL del archivo JSON alojado en la web
+        const jsonUrl = 'https://raw.githubusercontent.com/efunstats/1m4g3_41/branch1/data.json';
+
+        // Variables para el control de la paginación
+        let currentPage = 0;
+        const imagesPerPage = 20; // Cambiar el número de imágenes por página según sea necesario
+        let filteredImages = [];
+
+        // Función para cargar y mostrar las imágenes en la página actual
+        async function loadImages() {
+            const response = await fetch(jsonUrl);
+            const data = await response.json();
+            const filterInput = document.getElementById('filterInput');
+            const imageContainer = document.getElementById('imageContainer');
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+            const pageInfo = document.getElementById('pageInfo');
+
+            filterInput.addEventListener('input', () => {
+                const filterText = filterInput.value.toLowerCase().trim();
+                const filterTags = filterText.split(',').map(tag => tag.trim().replace(/[^a-zA-Z ]+/g, "").replace(/\s+/g, " ")).filter(tag => tag !== "");
+
+                filteredImages = data.filter(image => {
+                    const tags = image.tags.split(',').map(tag => tag.trim().toLowerCase().replace(/[^a-zA-Z ]+/g, "").replace(/\s+/g, " "));
+                    return filterTags.every(filterTag => tags.some(tag => tag.includes(filterTag)));
+                });
+
+                currentPage = 0;
+                showImagesOnPage(currentPage);
+            });
+
+            function showImagesOnPage(page) {
+                // Limpiar el contenedor de imágenes
+                imageContainer.innerHTML = '';
+
+                const start = page * imagesPerPage;
+                const end = start + imagesPerPage;
+                const pageImages = filteredImages.slice(start, end);
+
+                // Mostrar las imágenes de la página actual
+                pageImages.forEach(image => {
+                    const imageCard = document.createElement('div');
+                    imageCard.className = 'col-lg-3 col-md-4 col-sm-6 mb-4';
+                    imageCard.innerHTML = `
+                        <div class="card">
+                            <img src="${image.url_web}" class="card-img-top img-thumbnail" alt="${image.nombre}" data-bs-toggle="modal" data-bs-target="#imageModal" data-name="${image.nombre}" data-tags="${image.tags}">
+                        </div>
+                    `;
+                    imageContainer.appendChild(imageCard);
+                });
+
+                // Actualizar información de la página actual
+                const totalPages = Math.ceil(filteredImages.length / imagesPerPage);
+                pageInfo.textContent = `${page + 1}/${totalPages}`;
+
+                // Habilitar/deshabilitar botones de navegación
+                prevButton.disabled = page === 0;
+                nextButton.disabled = end >= filteredImages.length;
+            }
+
+            // Evento para mostrar la información ampliada al hacer clic en una imagen
+            imageContainer.addEventListener('click', (event) => {
+                const target = event.target;
+                if (target.tagName === 'IMG') {
+                    const name = target.getAttribute('data-name');
+                    const tags = target.getAttribute('data-tags');
+                    const modalLabel = document.getElementById('imageModalLabel');
+                    const modalImage = document.getElementById('modalImage');
+                    const modalTags = document.getElementById('modalTags');
+
+                    modalLabel.textContent = name;
+                    modalImage.src = target.src;
+                    modalTags.textContent = tags;
+                }
+            });
+
+            // Evento para navegar a la página anterior
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 0) {
+                    currentPage--;
+                    showImagesOnPage(currentPage);
+                }
+            });
+
+            // Evento para navegar a la página siguiente
+            nextButton.addEventListener('click', () => {
+                const start = currentPage * imagesPerPage;
+                const end = start + imagesPerPage;
+                if (end < filteredImages.length) {
+                    currentPage++;
+                    showImagesOnPage(currentPage);
+                }
+            });
+
+            // Cargar todas las imágenes al principio
+            filterInput.value = '';
+            filterInput.dispatchEvent(new Event('input'));
+        }
+
+        // Llamar a la función para cargar las imágenes
+        loadImages();
+    </script>
+</body>
+</html>
